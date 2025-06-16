@@ -1,3 +1,4 @@
+#We Rise Again
 from flask import Flask, render_template, request, session, redirect, url_for
 import pandas as pd
 import joblib
@@ -8,14 +9,12 @@ import time
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 
-# Load model and transformer
 try:
     model = joblib.load('model.pkl')
     ct = joblib.load('feature_values.joblib')
 except Exception as e:
     print(f"Error loading model files: {e}")
 
-# Default values for all expected columns based on OSMI survey
 DEFAULT_VALUES = {
     'Age': 30,
     'Gender': 'Male',
@@ -41,7 +40,14 @@ DEFAULT_VALUES = {
     'obs_consequence': 'No'
 }
 
-# Mapping for responses that need standardization
+
+EMPLOYER_SPECIFIC_QUESTIONS = [
+    'no_employees', 'tech_company', 'benefits', 'care_options',
+    'wellness_program', 'seek_help', 'anonymity', 'leave',
+    'mental_health_consequence', 'phys_health_consequence',
+    'coworkers', 'supervisor', 'mental_vs_physical', 'obs_consequence'
+]
+
 RESPONSE_MAPPING = {
     'leave': {
         'Very easy': 'Very easy',
@@ -55,14 +61,12 @@ RESPONSE_MAPPING = {
     'work_interfere': {
         'I don\'t experience mental health issues': 'Never'
     },
-    # Add standardization for phys_health_consequence
     'phys_health_consequence': {
         'Yes': 'Yes',
         'No': 'No',
         'Maybe': 'Maybe',
-        'them': 'Maybe'  # Handle the 'them' case
+        'them': 'Maybe' 
     },
-    # Add standardization for similar fields
     'mental_health_consequence': {
         'Yes': 'Yes',
         'No': 'No',
@@ -136,7 +140,8 @@ QUESTIONS = [
         "options": ["1-5", "6-25", "26-100", "100-500", "500+"],
         "required": True,
         "emoji": "🏢",
-        "category": "Employment"
+        "category": "Employment",
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "remote_work",
@@ -154,7 +159,8 @@ QUESTIONS = [
         "options": ["Yes", "No", "Not sure"],
         "required": True,
         "emoji": "💻",
-        "category": "Employment"
+        "category": "Employment",
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "benefits",
@@ -163,7 +169,8 @@ QUESTIONS = [
         "options": ["Yes", "No", "Don't know"],
         "required": True,
         "emoji": "🏥",
-        "category": "Work Benefits"
+        "category": "Work Benefits",
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "care_options",
@@ -171,8 +178,9 @@ QUESTIONS = [
         "type": "select",
         "options": ["Yes", "No", "Not sure"],
         "required": True,
-        "emoji": "ℹ️",
-        "category": "Work Benefits"
+        "emoji": "ℹ",
+        "category": "Work Benefits",
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "wellness_program",
@@ -181,7 +189,8 @@ QUESTIONS = [
         "options": ["Yes", "No", "Don't know"],
         "required": True,
         "emoji": "💬",
-        "category": "Work Environment"
+        "category": "Work Environment",
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "seek_help",
@@ -190,7 +199,8 @@ QUESTIONS = [
         "options": ["Yes", "No", "Don't know"],
         "required": True,
         "emoji": "🆘",
-        "category": "Work Benefits"
+        "category": "Work Benefits",
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "anonymity",
@@ -198,9 +208,10 @@ QUESTIONS = [
         "type": "select",
         "options": ["Yes", "No", "Don't know"],
         "required": True,
-        "emoji": "🕵️",
+        "emoji": "🕵",
         "category": "Work Benefits",
-        "sensitive": True
+        "sensitive": True,
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "leave",
@@ -208,9 +219,10 @@ QUESTIONS = [
         "type": "select",
         "options": ["Very easy", "Somewhat easy", "Somewhat difficult", "Very difficult", "I don't know"],
         "required": True,
-        "emoji": "⏸️",
+        "emoji": "⏸",
         "category": "Work Environment",
-        "sensitive": True
+        "sensitive": True,
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "mental_health_consequence",
@@ -218,9 +230,10 @@ QUESTIONS = [
         "type": "select",
         "options": ["Yes", "No", "Maybe"],
         "required": True,
-        "emoji": "⚠️",
+        "emoji": "⚠",
         "category": "Work Environment",
-        "sensitive": True
+        "sensitive": True,
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "phys_health_consequence",
@@ -228,8 +241,9 @@ QUESTIONS = [
         "type": "select",
         "options": ["Yes", "No", "Maybe"],
         "required": True,
-        "emoji": "⚠️",
-        "category": "Work Environment"
+        "emoji": "⚠",
+        "category": "Work Environment",
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "coworkers",
@@ -239,7 +253,8 @@ QUESTIONS = [
         "required": True,
         "emoji": "👥",
         "category": "Work Relationships",
-        "sensitive": True
+        "sensitive": True,
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "supervisor",
@@ -249,7 +264,8 @@ QUESTIONS = [
         "required": True,
         "emoji": "👔",
         "category": "Work Relationships",
-        "sensitive": True
+        "sensitive": True,
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "mental_health_interview",
@@ -276,8 +292,9 @@ QUESTIONS = [
         "type": "select",
         "options": ["Yes", "No", "Don't know"],
         "required": True,
-        "emoji": "⚖️",
-        "category": "Work Environment"
+        "emoji": "⚖",
+        "category": "Work Environment",
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     },
     {
         "id": "obs_consequence",
@@ -287,9 +304,24 @@ QUESTIONS = [
         "required": True,
         "emoji": "👀",
         "category": "Work Environment",
-        "sensitive": True
+        "sensitive": True,
+        "condition": lambda answers: answers.get('self_employed') == 'No'
     }
 ]
+
+def get_next_question_index(current_index, answers):
+    """Determine the next question index, skipping questions that don't apply"""
+    next_index = current_index + 1
+    
+    while next_index < len(QUESTIONS):
+        question = QUESTIONS[next_index]
+   
+        if 'condition' in question and not question['condition'](answers):
+            next_index += 1
+        else:
+            break
+    
+    return next_index
 
 @app.route('/')
 def home():
@@ -311,12 +343,18 @@ def show_question():
     if question_index >= len(QUESTIONS):
         return redirect(url_for('complete_assessment'))
     
+   
     question = QUESTIONS[question_index]
     
-    # Add some dynamic text based on previous answers
+   
+    if 'condition' in question and not question['condition'](session.get('answers', {})):
+        session['question_index'] = get_next_question_index(question_index, session.get('answers', {}))
+        return redirect(url_for('show_question'))
+    
+   
     if question_index > 0:
         prev_answer = session['answers'].get(QUESTIONS[question_index-1]['id'], '')
-        if prev_answer and random.random() > 0.7:  # 30% chance to reference previous answer
+        if prev_answer and random.random() > 0.7: 
             question = question.copy()
             references = [
                 f"Thanks for sharing that. {question['text']}",
@@ -326,11 +364,16 @@ def show_question():
             ]
             question['text'] = random.choice(references)
     
+  
+    total_questions = len([q for q in QUESTIONS if not ('condition' in q and not q['condition'](session.get('answers', {})))])
+    answered_questions = len([q for i, q in enumerate(QUESTIONS[:question_index]) 
+                            if not ('condition' in q and not q['condition'](session.get('answers', {})))])
+    
     return render_template('question.html', 
                          question=question, 
-                         progress=100*question_index/len(QUESTIONS),
-                         total_questions=len(QUESTIONS),
-                         current_question=question_index+1)
+                         progress=100*answered_questions/total_questions,
+                         total_questions=total_questions,
+                         current_question=answered_questions+1)
 
 @app.route('/assessment/answer', methods=['POST'])
 def process_answer():
@@ -341,8 +384,10 @@ def process_answer():
     session['answers'][question['id']] = answer
     session.modified = True
     
-    session['question_index'] += 1
+   
+    session['question_index'] = get_next_question_index(question_index, session['answers'])
     return redirect(url_for('show_question'))
+
 def standardize_response(question_id, response):
     """Standardize responses to match what the model expects"""
     if not response or str(response).strip() == '':
@@ -350,20 +395,15 @@ def standardize_response(question_id, response):
     
     response = str(response).strip()
     
-    # First check if we have specific mappings for this question
     if question_id in RESPONSE_MAPPING:
         mapping = RESPONSE_MAPPING[question_id]
-        # Check for direct matches first
         if response in mapping:
             return mapping[response]
-        # Check for partial matches
         for key in mapping:
             if key.lower() in response.lower():
                 return mapping[key]
     
-    # Handle special cases for other fields
     if question_id == 'Gender':
-        # Standardize gender responses
         gender_map = {
             'male': 'Male',
             'female': 'Female',
@@ -375,63 +415,64 @@ def standardize_response(question_id, response):
         for key in gender_map:
             if key in response.lower():
                 return gender_map[key]
-        return 'Other'  # Default for unrecognized genders
+        return 'Other' 
     
-    # Find the question by ID to get its options
     question = next((q for q in QUESTIONS if q['id'] == question_id), None)
     if question:
         return response if response in question.get('options', []) else DEFAULT_VALUES.get(question_id, 'Unknown')
     
-    # Default case - return the response or default value
     return DEFAULT_VALUES.get(question_id, 'Unknown')
+
 @app.route('/assessment/complete')
 def complete_assessment():
-    # Start with default values
+   
     data = DEFAULT_VALUES.copy()
     
-    # Update with user answers, with proper type conversion and standardization
+   
     for key, value in session.get('answers', {}).items():
-        # Handle emoji responses by extracting text
         if isinstance(value, str) and ' ' in value:
-            value = value.split(' ')[-1]  # Take last word after space
+            value = value.split(' ')[-1] 
         
-        # Standardize the response to match model expectations
         standardized_value = standardize_response(key, value)
         
-        # Convert to proper types
-        if key == 'Age':  # Numeric field
+        if key == 'Age':  
             try:
                 data[key] = int(standardized_value) if standardized_value else DEFAULT_VALUES[key]
-                # Ensure age is within reasonable bounds
                 data[key] = max(18, min(100, data[key]))
             except (ValueError, TypeError):
                 data[key] = DEFAULT_VALUES[key]
-        else:  # Categorical fields
+        else: 
             data[key] = str(standardized_value).strip() if standardized_value else DEFAULT_VALUES[key]
     
-    # Convert to DataFrame
+   
+    if data.get('self_employed') == 'Yes':
+        for question in EMPLOYER_SPECIFIC_QUESTIONS:
+            if question not in data:
+                if question in ['no_employees', 'tech_company']:
+                    data[question] = 'N/A (Self-employed)'
+                else:
+                    data[question] = DEFAULT_VALUES.get(question, 'Unknown')
+    
+  
     input_df = pd.DataFrame([data])
     
     try:
-        # Ensure all columns are present and in correct order
+       
         expected_columns = ct.feature_names_in_
         
-        # Add any missing columns with default values
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = DEFAULT_VALUES.get(col, 'Unknown')
         
-        # Remove any extra columns
         input_df = input_df[expected_columns]
         
-        # Debug: Print the data being sent to the model
         app.logger.info(f"Input data for model: {input_df.to_dict('records')[0]}")
         
-        # Apply transformations
+      
         X = ct.transform(input_df)
         prediction = model.predict(X)[0]
         
-        # Add some delay for dramatic effect
+       
         time.sleep(2)
         
         return render_template('output.html', prediction=prediction)
